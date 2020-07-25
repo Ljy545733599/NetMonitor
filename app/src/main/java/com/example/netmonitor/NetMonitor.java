@@ -8,11 +8,21 @@ import android.net.ConnectivityManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class NetMonitor {
-    private static List<OnNetworkChangeListener> onNetworkChangeListeners;
+    private List<OnNetworkChangeListener> onNetworkChangeListeners;
     private NetBroadcastReceiver netBroadcastReceiver;
     private Context context;
+
+    private ExecutorService executor = Executors.newCachedThreadPool();
+    private Runnable netChangeRunnable = new Runnable() {
+        @Override
+        public void run() {
+            notifyNetworkChange();
+        }
+    };
 
     public NetMonitor() {
         onNetworkChangeListeners = new ArrayList<>();
@@ -70,7 +80,7 @@ public class NetMonitor {
     /**
      * 通知网络状态更新
      */
-    private static void notifyNetworkChange() {
+    private void notifyNetworkChange() {
         for (OnNetworkChangeListener listener : onNetworkChangeListeners) {
             if (listener != null) {
                 listener.onNetworkChange();
@@ -78,18 +88,13 @@ public class NetMonitor {
         }
     }
 
-    private static class NetBroadcastReceiver extends BroadcastReceiver {
+    private class NetBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             //如果action是网络变化，则执行以下处理逻辑
             if (action != null && action.equals(ConnectivityManager.CONNECTIVITY_ACTION)) {
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        notifyNetworkChange();
-                    }
-                }).start();
+                executor.execute(netChangeRunnable);
             }
         }
     }
